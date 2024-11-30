@@ -7,7 +7,7 @@ class LocationHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final locations = ref.watch(locationHistoryProvider);
+    final locations = ref.watch(locationHistoryNotifierProvider);
 
     return Scaffold(
       appBar: AppBar(),
@@ -15,13 +15,10 @@ class LocationHistoryScreen extends ConsumerWidget {
         itemCount: locations.length,
         itemBuilder: (context, index) {
           final location = locations[index];
-          DateTime? time;
-          if (location.time != null) {
-            final epoch = (location.time! * 1000).toInt();
-            time = DateTime.fromMicrosecondsSinceEpoch(epoch);
-          }
+          final datetime =
+              DateTime.fromMicrosecondsSinceEpoch(location.timestamp);
           return ListTile(
-            title: Text('${time ?? ''}'),
+            title: Text('$datetime'),
             subtitle: Text('${location.latitude} ${location.longitude}'),
           );
         },
