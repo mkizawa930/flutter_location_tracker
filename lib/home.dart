@@ -53,15 +53,34 @@ class HomeScreen extends HookConsumerWidget {
                   if (isServiceRunning == false) {
                     debugPrint('start background location updates');
                     BackgroundLocation.startLocationService(distanceFilter: 10);
-                    isLocationUpdateRunning.value = true;
                   }
+                  debugPrint('位置情報の取得を開始');
                   BackgroundLocation.getLocationUpdates((location) {
-                    debugPrint('${location.latitude} ${location.longitude}');
-                    final epochTime = (location.time! * 1000).toInt();
+                    debugPrint(
+                        '${location.latitude} ${location.longitude} ${location.time}');
+
+                    if (location.latitude == null ||
+                        location.longitude == null) {
+                      return;
+                    }
+
+                    int epochTime;
+                    if (location.time == null) {
+                      epochTime = DateTime.now().microsecondsSinceEpoch;
+                    } else {
+                      epochTime = (location.time! * 1000).toInt();
+                    }
+
                     final myLocation = MyLocation(
-                        location.latitude!, location.longitude!, epochTime);
+                      location.latitude!,
+                      location.longitude!,
+                      epochTime,
+                    );
+                    final locations = ref.read(locationHistoryNotifierProvider);
+                    debugPrint('${[...locations]}');
                     locationHistoryNotifier.add(myLocation);
                   });
+                  isLocationUpdateRunning.value = true;
                 },
               ),
               TextButton(
@@ -72,6 +91,14 @@ class HomeScreen extends HookConsumerWidget {
                 },
               ),
             ],
+          ),
+          TextButton(
+            child: const Text('削除する'),
+            onPressed: () async {
+              await ref
+                  .read(locationHistoryNotifierProvider.notifier)
+                  .deleteAll();
+            },
           ),
           TextButton(
             child: const Text('一覧を見る'),
@@ -100,7 +127,7 @@ class MyLocation {
   MyLocation(this.latitude, this.longitude, this.timestamp);
 
   factory MyLocation.fromJson(Map<String, dynamic> json) {
-    return MyLocation(json['latitude'], json['logitude'], json['timestamp']);
+    return MyLocation(json['latitude'], json['longitude'], json['timestamp']);
   }
 
   Map<String, dynamic> toJson() {
@@ -121,25 +148,39 @@ class LocationHistoryNotifier extends Notifier<List<MyLocation>> {
     return _fetch();
   }
 
+  List<MyLocation> _fetch() {
+    final jsonString = _prefs.getString("locations");
+    if (jsonString == null) {
+      return [];
+    }
+    final decoded = jsonDecode(jsonString);
+    if (decoded is List && decoded.isNotEmpty) {
+      final json = decoded.cast<Map<String, dynamic>>();
+      try {
+        return json.map((item) => MyLocation.fromJson(item)).toList();
+      } catch (e) {
+        debugPrint('$e');
+        rethrow;
+      }
+    } else {
+      throw ('Unexpected JSON Schema: $json');
+    }
+  }
+
   Future<bool> add(MyLocation location) async {
+    debugPrint('${state.runtimeType}');
     state = [location, ...state];
     final jsonString = jsonEncode(state.map((loc) => loc.toJson()).toList());
     return await _prefs.setString("locations", jsonString);
   }
 
-  Future<bool> deleteAll(Location location) async {
-    return _prefs.remove('locations');
-  }
-
-  List<MyLocation> _fetch() {
-    final jsonString = _prefs.getString("locations");
-    if (jsonString == null) {
-      return [];
-    } else {
-      final List<Map<String, dynamic>> jsonList = jsonDecode(jsonString);
-      debugPrint('$jsonList');
-      return jsonList.map((json) => MyLocation.fromJson(json)).toList();
+  Future<bool> deleteAll() async {
+    final ok = await _prefs.remove('locations');
+    if (ok) {
+      debugPrint('削除しました');
+      state = [];
     }
+    return ok;
   }
 }
 
