@@ -1,3 +1,2 @@
-# background_location_demo
+# 位置情報を追跡するFlutterのデモアプリ
 
-A new Flutter project.
